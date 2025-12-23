@@ -1,6 +1,6 @@
-use actix_web::{web, App, HttpServer, Responder, post, get};
-use serde::{Deserialize, Serialize};
+use actix_web::{get, post, web, App, HttpServer, Responder};
 use dotenv::dotenv;
+use serde::{Deserialize, Serialize};
 use std::env;
 
 use serde_json;
@@ -28,9 +28,7 @@ async fn submit_form(form: web::Form<FormData>, data: web::Data<AppState>) -> im
     // Send email
     let api_key = data.api_key.clone();
     match send_email(&form.name, &form.email, &form.message, &form.id, &api_key).await {
-        Ok(_) => {
-            "Form submitted successfully! Email sent.".to_string()
-        }
+        Ok(_) => "Form submitted successfully! Email sent.".to_string(),
         Err(e) => {
             eprintln!("Failed to send email: {}", e);
             "Form submitted, but failed to send email.".to_string()
@@ -38,21 +36,34 @@ async fn submit_form(form: web::Form<FormData>, data: web::Data<AppState>) -> im
     }
 }
 
-async fn send_email(name: &str, email: &str, message: &str, id: &str, resend_api_key: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // Resend API configuration
-    let from_email = "noreply@eastcoastsoft.com"; // Replace with your verified "from" email in Resend
-
-    // Read accounts.json to find the recipient email based on ID
+async fn send_email(
+    name: &str,
+    email: &str,
+    message: &str,
+    id: &str,
+    resend_api_key: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Read accounts.json to find the recipient and sender email based on ID
     let accounts_json = include_str!("../accounts.json");
     let accounts: serde_json::Value = serde_json::from_str(&accounts_json)?;
-    let accounts_array = accounts.get("accounts")
+    let accounts_array = accounts
+        .get("accounts")
         .and_then(|acc| acc.as_array())
         .ok_or_else(|| "No 'accounts' array found in JSON".to_string())?;
-    let to_email = accounts_array.iter()
+    let account_entry = accounts_array
+        .iter()
         .find(|entry| entry.get("id").and_then(|val| val.as_str()) == Some(id))
-        .and_then(|entry| entry.get("email"))
+        .ok_or_else(|| format!("No account found for ID: {}", id))?;
+    let to_email = account_entry
+        .get("email")
         .and_then(|email| email.as_str())
-        .ok_or_else(|| format!("No email found for ID: {}", id))?.to_string();
+        .ok_or_else(|| format!("No recipient email found for ID: {}", id))?
+        .to_string();
+    let from_email = account_entry
+        .get("from_email")
+        .and_then(|email| email.as_str())
+        .ok_or_else(|| format!("No sender email found for ID: {}", id))?
+        .to_string();
 
     // Build the email payload
     let email_body = format!(
@@ -73,7 +84,8 @@ async fn send_email(name: &str, email: &str, message: &str, id: &str, resend_api
         .header("Authorization", format!("Bearer {}", resend_api_key))
         .header("Content-Type", "application/json")
         .json(&payload)
-        .send().await?;
+        .send()
+        .await?;
 
     // Print the response status and body even if the request fails
     println!("Response status: {}", response.status());
