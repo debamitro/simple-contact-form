@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{post, web, App, HttpServer, Responder};
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
@@ -97,10 +98,13 @@ async fn main() -> std::io::Result<()> {
     let api_key = env::var("RESEND_API_KEY").expect("RESEND_API_KEY must be set");
 
     HttpServer::new(move || {
+        let cors = Cors::default().allow_any_origin();
+
         App::new()
             .app_data(web::Data::new(AppState {
                 api_key: api_key.clone(),
             }))
+            .wrap(cors)
             .service(submit_form)
     })
     .bind(("0.0.0.0", 8080))?
