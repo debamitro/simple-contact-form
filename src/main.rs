@@ -96,6 +96,10 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
     let api_key = env::var("RESEND_API_KEY").expect("RESEND_API_KEY must be set");
+    let port: u16 = match env::var("PORT") {
+        Ok(v) => v.parse::<u16>().unwrap_or(8080),
+        Err(_) => 8080,
+    };
 
     HttpServer::new(move || {
         let cors = Cors::default().allow_any_origin();
@@ -107,7 +111,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .service(submit_form)
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", port))?
     .run()
     .await
 }
