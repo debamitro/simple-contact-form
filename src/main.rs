@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, App, HttpServer, Responder};
+use actix_web::{post, web, App, HttpServer, Responder};
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -20,11 +20,6 @@ struct AppState {
 
 #[post("/v1/submit")]
 async fn submit_form(form: web::Form<FormData>, data: web::Data<AppState>) -> impl Responder {
-    // Log the form submission
-    println!("Received form submission with ID: {}", form.id);
-    println!("From: {} ({})", form.name, form.email);
-    println!("Message: {}", form.message);
-
     // Send email
     let api_key = data.api_key.clone();
     match send_email(&form.name, &form.email, &form.message, &form.id, &api_key).await {
@@ -87,18 +82,9 @@ async fn send_email(
         .send()
         .await?;
 
-    // Print the response status and body even if the request fails
-    println!("Response status: {}", response.status());
-    if let Ok(json_response) = response.json::<serde_json::Value>().await {
-        println!("Response body: {}", json_response);
-    } else {
-        println!("Failed to parse response as JSON");
+    if !response.status().is_success() {
+        return Err(response.text().await?.into());
     }
-
-    // Still return an error if the status is not successful
-    //response.error_for_status()?;
-
-    //println!("Email sent successfully to {}. Response: {:?}", to_email, response.json::<serde_json::Value>().await.unwrap_or_else(|_| serde_json::json!({"error": "Failed to parse JSON response"})));
 
     Ok(())
 }
@@ -108,13 +94,8 @@ async fn main() -> std::io::Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
 
-    // Example: Access an environment variable
-    let api_key = env::var("MAILERSEND_API_KEY").expect("MAILERSEND_API_KEY must be set");
+    let api_key = env::var("RESEND_API_KEY").expect("RESEND_API_KEY must be set");
 
-    // Log or use the variable as needed
-    println!("Using API Key: {}", api_key);
-
-    println!("Starting server at http://127.0.0.1:8080");
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(AppState {
@@ -122,7 +103,7 @@ async fn main() -> std::io::Result<()> {
             }))
             .service(submit_form)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }
