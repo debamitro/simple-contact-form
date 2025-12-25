@@ -63,8 +63,8 @@ async fn send_email(
 
     // Build the email payload
     let email_body = format!(
-        "New form submission:<br><br><strong>ID:</strong> {}<br><strong>Name:</strong> {}<br><strong>Email:</strong> {}<br><strong>Message:</strong> {}",
-        id, name, email, message
+        "New form submission:<br><br><strong>Name:</strong> {}<br><strong>Email:</strong> {}<br><strong>Message:</strong> {}",
+        name, email, message
     );
     let payload = serde_json::json!({
         "from": from_email,
